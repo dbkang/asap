@@ -1,4 +1,4 @@
-package com.example
+package asapstack
 
 import akka.actor.{ActorSystem, Props}
 import akka.io.IO
@@ -8,6 +8,15 @@ import akka.util.Timeout
 import scala.concurrent.duration._
 
 object Boot extends App {
+
+  val conn = DB.connection
+  val statement = conn.createStatement()
+  val rs = statement.executeQuery("select * from information_schema.tables")
+  while (rs.next()) {
+    println(rs.getString(3))
+  }
+  rs.close();
+  statement.close();
 
   // we need an ActorSystem to host our application in
   implicit val system = ActorSystem("on-spray-can")
