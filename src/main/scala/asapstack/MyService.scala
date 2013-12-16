@@ -44,6 +44,11 @@ trait MyService extends HttpService {
       getFromResourceDirectory("static/")
     } ~
     path("") {
+      get {
+        redirect("/dynamic/", StatusCodes.MovedPermanently)
+      }
+    } ~
+    pathPrefix("dynamic") {
       getFromResource("static/index.html")
     }
   }
