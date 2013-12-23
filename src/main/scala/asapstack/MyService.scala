@@ -4,6 +4,11 @@ import akka.actor.Actor
 import spray.routing._
 import spray.http._
 import MediaTypes._
+import spray.json._
+import JsonProtocol._
+import reflect.ClassTag
+import spray.httpx.SprayJsonSupport._
+
 
 // we don't implement our route structure directly in the service actor because
 // we want to be able to test it independently, without having to spin up an actor
@@ -71,6 +76,24 @@ trait MyService extends HttpService {
       }
     }
   }
-  
-  val myRoute = testRoute ~ staticRoute ~ apiRoute
+
+  val dbRoute = {
+    pathPrefix("db") {
+      path("tables") {
+        get {
+          complete {
+            val result = DB.executeQuery("select * from information_schema.tables")
+            val x:Array[Map[String,Object]] = result.toArray
+            x
+            //Array[Any](1,2,3,Array(1,2,3))
+            //Color("hey", 1, 2, 3)
+            //val m = Map.empty[String, Object] + ("hey" -> "man") + ("yoyo" -> "ma")
+            //Array[Map[String,Object]](m, m)
+          }
+        }
+      }
+    }
+  }
+
+  val myRoute = testRoute ~ staticRoute ~ apiRoute ~ dbRoute
 }
