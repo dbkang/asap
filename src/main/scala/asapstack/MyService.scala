@@ -8,7 +8,7 @@ import spray.json._
 import JsonProtocol._
 import reflect.ClassTag
 import spray.httpx.SprayJsonSupport._
-
+import scala.collection.mutable.ArrayBuffer
 
 // we don't implement our route structure directly in the service actor because
 // we want to be able to test it independently, without having to spin up an actor
@@ -73,27 +73,18 @@ trait MyService extends HttpService {
             "test2"
           }
         }
-      }
-    }
-  }
-
-  val dbRoute = {
-    pathPrefix("db") {
-      path("tables") {
-        get {
-          complete {
-            val result = DB.executeQuery("select * from information_schema.tables")
-            val x:Array[Map[String,Object]] = result.toArray
-            x
-            //Array[Any](1,2,3,Array(1,2,3))
-            //Color("hey", 1, 2, 3)
-            //val m = Map.empty[String, Object] + ("hey" -> "man") + ("yoyo" -> "ma")
-            //Array[Map[String,Object]](m, m)
+      } ~
+      pathPrefix("db") {
+        path("tables") {
+          get {
+            complete {
+              DB.executeQuery("select * from information_schema.tables")
+            }
           }
         }
       }
     }
   }
 
-  val myRoute = testRoute ~ staticRoute ~ apiRoute ~ dbRoute
+  val myRoute = testRoute ~ staticRoute ~ apiRoute
 }

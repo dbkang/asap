@@ -2,6 +2,7 @@ package asapstack
 
 import java.sql.{Array => SqlArray, _}
 import scala.collection.mutable.{ArrayBuffer, HashMap => MutableHashMap}
+import scala.collection.immutable.Vector
 
 object DB {
   def init = {
@@ -22,9 +23,9 @@ object DB {
 
   val defaultDatabase = "asap"
 
-  def resultSetToArrayBuffer(rs: ResultSet) = {
-    val metadata = rs.getMetaData()
-    val colCount = metadata.getColumnCount()
+  def resultSetToVector(rs: ResultSet) = {
+    val metadata = rs.getMetaData
+    val colCount = metadata.getColumnCount
     val colNames = Array.ofDim[String](colCount + 1)
     for (i <- 1 to colCount) {
       colNames(i) = metadata.getColumnName(i)
@@ -37,17 +38,28 @@ object DB {
       }
       result += map.toMap
     }
-    result
+    result.toVector
   }
   
   // returns query result as an ArrayBuffer of mutable HashMaps for manageability
   def executeQuery(sql: String) = {
     execute {
       conn => {
-        val statement = conn.createStatement()
+        val statement = conn.createStatement
         val rs = statement.executeQuery(sql)
-        val result = resultSetToArrayBuffer(rs)
+        val result = resultSetToVector(rs)
         rs.close()
+        statement.close()
+        result
+      }
+    }
+  }
+
+  def executeUpdate(sql: String) = {
+    execute {
+      conn => {
+        val statement = conn.createStatement
+        val result = statement.executeUpdate(sql)
         statement.close()
         result
       }
