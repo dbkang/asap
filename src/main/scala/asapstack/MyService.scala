@@ -63,7 +63,7 @@ trait MyService extends HttpService {
       path("test1") {
         get {
           complete {
-            "test1"
+            Resources.load("/static/index.html")
           }
         }
       } ~
