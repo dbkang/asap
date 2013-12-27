@@ -27,6 +27,7 @@ class MyServiceActor extends Actor with MyService {
 
 // this trait defines our service behavior independently from the service actor
 trait MyService extends HttpService {
+  implicit val printer = CompactPrinter
 
   val testRoute = {
     path("test") {
