@@ -1,17 +1,17 @@
 package asapstack
 
 import java.sql.{Array => SqlArray, _}
+import javax.sql._
 import scala.collection.mutable.{ArrayBuffer, HashMap => MutableHashMap}
 import scala.collection.immutable.Vector
 import java.io.File
 import java.security.MessageDigest
 
 object DB {
-  val MigrationPath = "migration"
+  private val MigrationPath = "migration"
   val DefaultDatabase = "asap"
-  var connectionString = "jdbc:postgresql:dan"
+  private var connectionString = "jdbc:postgresql:dan"
   def connection = DriverManager.getConnection(connectionString, "dan", "password")
-
 
   def init = {
     Class.forName("org.postgresql.Driver")
@@ -34,11 +34,15 @@ object DB {
     Resources.loadLines(s"/$path/list").toSeq.flatMap(x => x).map(s => s.trim)
   }
 
-  lazy val migrationHistoryExists = {
+  private lazy val migrationHistoryExists = {
     val migrationHistory = executeQuery(
       "select 1 from information_schema.tables where table_name = 'migration_history' and " +
       s"table_catalog = '$DefaultDatabase'")
-    migrationHistory.length > 0
+    migrationHistory match {
+      case None => false
+      case Some(Vector()) => false
+      case _ => true
+    }
   }
 
   def executeMigration(migration: String) = {
@@ -49,7 +53,7 @@ object DB {
         val bytes = script_content.getBytes("UTF-8")
         val digest = md5.digest(bytes).map(b => "%02X".format(b)).mkString
         if (!migrationHistoryExists ||
-            executeQuery(s"select 1 from migration_history where script_hash = '$digest'").length == 0
+            executeQuery(s"select 1 from migration_history where script_hash = '$digest'").get.length == 0
           ) {
           executeUpdate(script_content)
           execute {
@@ -62,7 +66,7 @@ object DB {
               statement.setString(3, digest)
               statement.setString(4, script_content)
               statement.setTimestamp(5, new Timestamp((new java.util.Date).getTime))
-              statement.executeUpdate()
+              Some(statement.executeUpdate())
             }
           }
         }
@@ -93,37 +97,59 @@ object DB {
     result.toVector
   }
   
-  // returns query result as an ArrayBuffer of mutable HashMaps for manageability
-  def executeQuery(sql: String) = {
+  // returns query result as a Vector of Maps for manageability
+  def executeQuery(conn: Connection, sql: String): Option[Vector[Map[String, Object]]] = {
+    val statement = conn.createStatement
+    val rs = statement.executeQuery(sql)
+    val result = resultSetToVector(rs)
+    rs.close()
+    statement.close()
+    Some(result)
+  }
+
+  def executeQuery(sql: String): Option[Vector[Map[String, Object]]] = {
+    execute(conn => executeQuery(conn, sql))
+  }
+
+  def executeUpdate(conn: Connection, sql: String): Option[Int] = {
+    val statement = conn.createStatement
+    val result = statement.executeUpdate(sql)
+    statement.close()
+    Some(result)
+  }
+
+  def executeUpdate(sql: String): Option[Int] = {
+    execute(conn => executeUpdate(conn, sql))
+  }
+
+  def executeTransaction[T](f: Connection => Option[T]) = {
     execute {
       conn => {
-        val statement = conn.createStatement
-        val rs = statement.executeQuery(sql)
-        val result = resultSetToVector(rs)
-        rs.close()
-        statement.close()
-        result
+        try {
+          conn.setAutoCommit(false)
+          val result = f(conn)
+          conn.commit()
+          result
+        } catch {
+          case x: Throwable => {
+            conn.rollback()
+            x.printStackTrace()
+            None
+          }
+        }
       }
     }
   }
 
-  def executeUpdate(sql: String) = {
-    println(sql)
-    execute {
-      conn => {
-        val statement = conn.createStatement
-        val result = statement.executeUpdate(sql)
-        statement.close()
-        result
-      }
+  def execute[T](f: Connection => Option[T]):Option[T] = {
+    try {
+      val conn = connection
+      val result = f(conn)
+      conn.close()
+      result
+    } catch {
+      case x: Throwable => x.printStackTrace; None
     }
-  }
-
-  def execute[T](f: Connection => T) = {
-    val conn = connection
-    val result = f(conn)
-    conn.close()
-    result
   }
   init
 }

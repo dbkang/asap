@@ -4,11 +4,11 @@ create table key_value_history
         bucket          text,
         key             text,
         stamp           bigint,
-        value           json
+        value           json,
         primary key (collection, bucket, key, stamp)
 );
 
-create index on key_value_history (stamp)
+create index on key_value_history (stamp);
 
 create table last_stamp
 (

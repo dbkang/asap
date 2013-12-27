@@ -12,4 +12,8 @@ object JsonProtocol extends DefaultJsonProtocol {
     }
     def read(value: JsValue) = value
   }
+  implicit object JsValueJsonFormat extends RootJsonFormat[JsValue] {
+    def write(js: JsValue) = js
+    def read(js: JsValue) = js
+  }
 }

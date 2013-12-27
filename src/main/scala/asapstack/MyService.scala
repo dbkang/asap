@@ -81,6 +81,25 @@ trait MyService extends HttpService {
               DB.executeQuery("select * from information_schema.tables")
             }
           }
+        } ~
+        path("keyvalue") {
+          get {
+            complete {
+              KeyValueStore("mycollection")("mybucket", "mykey")
+            }
+          } ~
+          put {
+            decompressRequest() {
+              entity(as[JsValue]) {
+                jsv =>
+                  detach() {
+                    complete {
+                      KeyValueStore("mycollection")("mybucket", "mykey") = jsv
+                    }
+                  }
+              }
+            }
+          }
         }
       }
     }
