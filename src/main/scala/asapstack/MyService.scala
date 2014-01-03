@@ -78,15 +78,19 @@ trait MyService extends HttpService {
       pathPrefix("db") {
         path("tables") {
           get {
-            complete {
-              DB.executeQuery("select * from information_schema.tables")
+            detach () {
+              complete {
+                DB.executeQuery("select * from information_schema.tables")
+              }
             }
           }
         } ~
         path("keyvalue") {
           get {
-            complete {
-              KeyValueStore("mycollection")("mybucket", "mykey")
+            detach () {
+              complete {
+                KeyValueStore("mycollection")("mybucket", "mykey")
+              }
             }
           } ~
           put {
