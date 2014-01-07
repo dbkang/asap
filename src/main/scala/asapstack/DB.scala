@@ -39,8 +39,7 @@ object DB {
       "select 1 from information_schema.tables where table_name = 'migration_history' and " +
       s"table_catalog = '$DefaultDatabase'")
     migrationHistory match {
-      case None => false
-      case Some(Vector()) => false
+      case Vector() => false
       case _ => true
     }
   }
@@ -53,7 +52,7 @@ object DB {
         val bytes = script_content.getBytes("UTF-8")
         val digest = md5.digest(bytes).map(b => "%02X".format(b)).mkString
         if (!migrationHistoryExists ||
-            executeQuery(s"select 1 from migration_history where script_hash = '$digest'").get.length == 0
+            executeQuery(s"select 1 from migration_history where script_hash = '$digest'").length == 0
           ) {
           executeUpdate(script_content)
           execute {
@@ -66,7 +65,7 @@ object DB {
               statement.setString(3, digest)
               statement.setString(4, script_content)
               statement.setTimestamp(5, new Timestamp((new java.util.Date).getTime))
-              Some(statement.executeUpdate())
+              statement.executeUpdate()
             }
           }
         }
@@ -98,58 +97,93 @@ object DB {
   }
   
   // returns query result as a Vector of Maps for manageability
-  def executeQuery(conn: Connection, sql: String): Option[Vector[Map[String, Object]]] = {
+  def runQuery(conn: Connection, sql: String): Vector[Map[String, Object]] = {
     val statement = conn.createStatement
     val rs = statement.executeQuery(sql)
     val result = resultSetToVector(rs)
     rs.close()
     statement.close()
-    Some(result)
+    result
   }
 
-  def executeQuery(sql: String): Option[Vector[Map[String, Object]]] = {
-    execute(conn => executeQuery(conn, sql))
+  def executeQuery(sql: String): Vector[Map[String, Object]] = {
+    execute(conn => runQuery(conn, sql))
   }
 
-  def executeUpdate(conn: Connection, sql: String): Option[Int] = {
-    val statement = conn.createStatement
-    val result = statement.executeUpdate(sql)
-    statement.close()
-    Some(result)
-  }
-
-  def executeUpdate(sql: String): Option[Int] = {
-    execute(conn => executeUpdate(conn, sql))
-  }
-
-  def executeTransaction[T](f: Connection => Option[T]) = {
-    execute {
-      conn => {
-        try {
-          conn.setAutoCommit(false)
-          val result = f(conn)
-          conn.commit()
-          result
-        } catch {
-          case x: Throwable => {
-            conn.rollback()
-            x.printStackTrace()
-            None
-          }
-        }
-      }
-    }
-  }
-
-  def execute[T](f: Connection => Option[T]):Option[T] = {
+  def runQueryOption(conn: Connection, sql: String): Option[Vector[Map[String, Object]]] = {
     try {
-      val conn = connection
-      val result = f(conn)
-      conn.close()
-      result
+      Some(runQuery(conn, sql))
     } catch {
       case x: Throwable => x.printStackTrace; None
     }
   }
+
+  def executeQueryOption(sql: String): Option[Vector[Map[String, Object]]] = {
+    executeOption(conn => Some(runQuery(conn, sql)))
+  }
+
+  def runUpdate(conn: Connection, sql: String): Int = {
+    val statement = conn.createStatement
+    val result = statement.executeUpdate(sql)
+    statement.close()
+    result
+  }
+
+  def runUpdateOption(conn: Connection, sql: String): Option[Int] = {
+    try {
+      Some(runUpdate(conn, sql))
+    } catch {
+      case x: Throwable => x.printStackTrace; None
+    }
+  }
+
+
+  def executeUpdate(sql: String): Int = {
+    execute(conn => runUpdate(conn, sql))
+  }
+
+  def executeUpdateOption(sql: String): Option[Int] = {
+    executeOption(conn => Some(runUpdate(conn, sql)))
+  }
+
+
+  def runTransaction[T](conn: Connection, f: Connection => T): T = {
+    try {
+      conn.setAutoCommit(false)
+      val result = f(conn)
+      conn.commit()
+      result
+    } catch {
+      case x: Throwable => {
+        conn.rollback()
+        throw x
+      }
+    }
+  }
+
+  def executeTransaction[T](f: Connection => T): T = {
+    execute(conn => runTransaction(conn, f))
+  }
+
+
+  def executeTransactionOption[T](f: Connection => Option[T]): Option[T] = {
+    executeOption(conn => runTransaction(conn, f))
+  }
+
+  def execute[T](f: Connection => T): T = {
+    val conn = connection
+    val result = f(conn)
+    conn.close()
+    result
+  }
+
+  def executeOption[T](f: Connection => Option[T]): Option[T] = {
+    try {
+      execute(f)
+    } catch {
+      case x: Throwable => x.printStackTrace; None
+    }
+  }
+
   init
 }
