@@ -7,28 +7,32 @@ import java.sql.{Array => SqlArray, _}
 
 
 class KeyValueStore(val collection: String) {
-  def apply(bucket: String, key: String):JsValue = {
-    val query = "select value from key_value_history where collection = ? and bucket = ? and key = ? and " +
-    "stamp in (select max(stamp) from key_value_history where collection = ? and bucket = ? and key = ?)"
-    DB.execute {
-      conn => {
-        val statement = conn.prepareStatement(query)
-        statement.setString(1, collection)
-        statement.setString(2, bucket)
-        statement.setString(3, key)
-        statement.setString(4, collection)
-        statement.setString(5, bucket)
-        statement.setString(6, key)
-        DB.resultSetToVector(statement.executeQuery()).headOption.map(x => jsonFromPGobject(x("value"))).get
-      }
-    }
+  def apply(bucket: String, key: String): JsValue = {
+    DB.execute(conn => read(conn, bucket, key))
+  }
+
+  def apply(bucket: String, key: Long): JsValue = {
+    apply(bucket, key.toString)
   }
 
   def jsonFromPGobject(o: Object) = {
     o.asInstanceOf[PGobject].getValue.asJson
   }
 
-  def insert(conn: Connection, stamp: Long, bucket: String, key: String, value: String) = {
+  def read(conn: Connection, bucket: String, key: String): JsValue = {
+    val query = "select value from key_value_history where collection = ? and bucket = ? and key = ? and " +
+    "stamp in (select max(stamp) from key_value_history where collection = ? and bucket = ? and key = ?)"
+    val statement = conn.prepareStatement(query)
+    statement.setString(1, collection)
+    statement.setString(2, bucket)
+    statement.setString(3, key)
+    statement.setString(4, collection)
+    statement.setString(5, bucket)
+    statement.setString(6, key)
+    DB.resultSetToVector(statement.executeQuery()).headOption.map(x => jsonFromPGobject(x("value"))).get
+  }
+
+  def insert(conn: Connection, stamp: Long, bucket: String, key: String, value: String): Unit = {
     val sql = "insert into key_value_history (collection, bucket, key, stamp, value) " +
     "values (?, ?, ?, ?, ?)"
     val valueObj = new PGobject
@@ -43,6 +47,18 @@ class KeyValueStore(val collection: String) {
     statement.executeUpdate()
   }
 
+  def insert(conn: Connection, stamp: Long, bucket: String, key: String, value: JsValue): Unit = {
+    insert(conn, stamp, bucket, key, value.compactPrint)
+  }
+
+  def insert(conn: Connection, stamp: Long, bucket: String, key: Long, value: JsValue): Unit = {
+    insert(conn, stamp, bucket, key.toString, value.compactPrint)
+  }
+
+  def insert(conn: Connection, stamp: Long, bucket: String, key: String, value: Long): Unit = {
+    insert(conn, stamp, bucket, key, JsNumber(value))
+  }
+
   def update(bucket: String, key: String, value: JsValue): JsValue = {
     update(bucket, key, value.compactPrint)
     value
@@ -54,6 +70,8 @@ class KeyValueStore(val collection: String) {
     value
   }
 
+  // TODO: Not sure if this is actually safe in a high-transaction environment.  What happens
+  // if multiple queries are run.  Is this just a poor reimplementation of auto-increment?
   def getStamp = {
     DB.executeTransaction {
       conn => {

@@ -8,10 +8,33 @@ import spray.json._
 class AutoStore(val collection: String, val name: String) {
   val kv = KeyValueStore(collection)
   val bucket = s"auto:$name"
-  val latestKey = s"auto:$name:latest"
-  
+  val latestBucket = s"auto:$name:latest"
+  val latestKey = "default"
+
   def insert(value: JsValue) = {
-    
+    val stamp = kv.getStamp
+    DB.executeTransaction {
+      conn => {
+        val latest = kv.read(conn, latestBucket, latestKey) match {
+          case JsNumber(x) => x.toLongExact + 1
+        }
+        kv.insert(conn, stamp, latestBucket, latestKey, latest)
+        kv.insert(conn, stamp, bucket, latest, value)
+      }
+    }
+  }
+
+  def apply(id: Long) = {
+    kv(bucket, id)
+  }
+
+  def update(id: Long, value: JsValue) = {
+    val stamp = kv.getStamp
+    DB.executeTransaction {
+      conn => {
+        kv.insert(conn, stamp, bucket, id, value)
+      }
+    }
   }
 
 }
