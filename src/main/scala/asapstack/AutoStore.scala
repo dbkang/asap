@@ -15,13 +15,19 @@ class AutoStore(val collection: String, val name: String) {
     val stamp = kv.getStamp
     DB.executeTransaction {
       conn => {
-        val latest = kv.read(conn, latestBucket, latestKey) match {
-          case JsNumber(x) => x.toLongExact + 1
+        val latest = kv.readOption(conn, latestBucket, latestKey) match {
+          case Some(JsNumber(x)) => x.toLongExact + 1
+          case _ => 1
         }
         kv.insert(conn, stamp, latestBucket, latestKey, latest)
         kv.insert(conn, stamp, bucket, latest, value)
+        latest
       }
     }
+  }
+
+  def toSeq = {
+    kv(bucket).map(_.toLong)
   }
 
   def apply(id: Long) = {

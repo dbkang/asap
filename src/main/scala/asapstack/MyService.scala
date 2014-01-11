@@ -42,6 +42,52 @@ trait MyService extends HttpService {
           }
         }
       }
+    } ~
+    path("test1") {
+      get {
+        complete {
+          Resources.load("/static/index.html")
+        }
+      }
+    } ~
+    path("test2") {
+      get {
+        complete {
+          "test2"
+          }
+      }
+    } ~
+    pathPrefix("db") {
+      path("tables") {
+        get {
+          detach () {
+            complete {
+              DB.executeQuery("select * from information_schema.tables")
+            }
+          }
+        }
+      } ~
+      path("keyvalue") {
+        get {
+          detach () {
+            complete {
+              KeyValueStore("mycollection")("mybucket", "mykey")
+            }
+          }
+        } ~
+        put {
+          decompressRequest() {
+            entity(as[JsValue]) {
+              jsv =>
+                detach() {
+                  complete {
+                    KeyValueStore("mycollection")("mybucket", "mykey") = jsv
+                  }
+                }
+            }
+          }
+        }
+      }
     }
   }
 
@@ -61,47 +107,51 @@ trait MyService extends HttpService {
 
   val apiRoute = {
     pathPrefix("api") {
-      path("test1") {
-        get {
-          complete {
-            Resources.load("/static/index.html")
-          }
-        }
-      } ~
-      path("test2") {
-        get {
-          complete {
-            "test2"
-          }
-        }
-      } ~
-      pathPrefix("db") {
-        path("tables") {
-          get {
-            detach () {
-              complete {
-                DB.executeQuery("select * from information_schema.tables")
+      pathPrefix("autostore" / Segment / Segment) {
+        (collection, name) => {
+          pathEnd {
+            get {
+              detach () {
+                complete {
+                  AutoStore(collection, name).toSeq
+                }
               }
-            }
-          }
-        } ~
-        path("keyvalue") {
-          get {
-            detach () {
-              complete {
-                KeyValueStore("mycollection")("mybucket", "mykey")
-              }
-            }
-          } ~
-          put {
-            decompressRequest() {
-              entity(as[JsValue]) {
-                jsv =>
-                  detach() {
-                    complete {
-                      KeyValueStore("mycollection")("mybucket", "mykey") = jsv
+            } ~
+            post {
+              decompressRequest() {
+                entity(as[JsValue]) {
+                  jsv =>
+                    detach () {
+                      complete {
+                        AutoStore(collection, name).insert(jsv)
+                      }
                     }
+                }
+              }
+            }
+
+          } ~
+          path (LongNumber) {
+            id => {
+              get {
+                detach () {
+                  complete {
+                    AutoStore(collection, name)(id)
                   }
+                }
+              } ~
+              put {
+                decompressRequest() {
+                  entity(as[JsValue]) {
+                    jsv =>
+                      detach () {
+                        complete {
+                          AutoStore(collection, name)(id) = jsv
+                          id
+                        }
+                      }
+                  }
+                }
               }
             }
           }

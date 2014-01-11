@@ -15,21 +15,37 @@ class KeyValueStore(val collection: String) {
     apply(bucket, key.toString)
   }
 
+  def apply(bucket: String): Seq[String] = {
+    DB.execute(conn => read(conn, bucket))
+  }
+
   def jsonFromPGobject(o: Object) = {
     o.asInstanceOf[PGobject].getValue.asJson
   }
 
   def read(conn: Connection, bucket: String, key: String): JsValue = {
-    val query = "select value from key_value_history where collection = ? and bucket = ? and key = ? and " +
-    "stamp in (select max(stamp) from key_value_history where collection = ? and bucket = ? and key = ?)"
+    readOption(conn, bucket, key).get
+  }
+
+  def read(conn: Connection, bucket: String): Seq[String] = {
+    val query = "select key from key_value_history kvh where collection = ? and bucket = ? and " +
+    "stamp in (select max(stamp) from key_value_history where collection = kvh.collection and bucket = kvh.bucket " +
+    "and key = kvh.key) and value::text <> 'null'"
+    val statement = conn.prepareStatement(query)
+    statement.setString(1, collection)
+    statement.setString(2, bucket)
+    DB.resultSetToVector(statement.executeQuery()).map(x => x("key").asInstanceOf[String])
+  }
+
+  def readOption(conn: Connection, bucket: String, key: String): Option[JsValue] = {
+    val query = "select value from key_value_history kvh where collection = ? and bucket = ? and key = ? and " +
+    "stamp in (select max(stamp) from key_value_history where collection = kvh.collection and bucket = kvh.bucket " +
+    "and key = kvh.key)"
     val statement = conn.prepareStatement(query)
     statement.setString(1, collection)
     statement.setString(2, bucket)
     statement.setString(3, key)
-    statement.setString(4, collection)
-    statement.setString(5, bucket)
-    statement.setString(6, key)
-    DB.resultSetToVector(statement.executeQuery()).headOption.map(x => jsonFromPGobject(x("value"))).get
+    DB.resultSetToVector(statement.executeQuery()).headOption.map(x => jsonFromPGobject(x("value")))
   }
 
   def insert(conn: Connection, stamp: Long, bucket: String, key: String, value: String): Unit = {

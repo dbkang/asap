@@ -16,4 +16,12 @@ object JsonProtocol extends DefaultJsonProtocol {
     def write(js: JsValue) = js
     def read(js: JsValue) = js
   }
+
+  implicit object RootLongJsonFormat extends RootJsonFormat[Long] {
+    def write(x: Long) = JsNumber(x)
+    def read(value: JsValue) = value match {
+      case JsNumber(x) => x.longValue
+      case x => deserializationError("Expected Long as JsNumber, but got " + x)
+    }
+  }
 }
