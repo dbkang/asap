@@ -86,14 +86,11 @@ class KeyValueStore(val collection: String) {
     value
   }
 
-  // TODO: Not sure if this is actually safe in a high-transaction environment.  What happens
-  // if multiple queries are run.  Is this just a poor reimplementation of auto-increment?
   def getStamp = {
     DB.executeTransaction {
       conn => {
-        DB.runUpdate(conn, "update last_stamp set last_stamp = last_stamp + 1")
-        val result = DB.runQuery(conn, "select last_stamp from last_stamp")
-        val stampValue = result.headOption.map(_("last_stamp").asInstanceOf[java.lang.Long].longValue).get
+        val result = DB.runQuery(conn, "select nextval('stamp')");
+        val stampValue = result.headOption.map(_("nextval").asInstanceOf[java.lang.Long].longValue).get
         val s = conn.prepareStatement("insert into stamp_time (stamp, universal_time) values (?, ?)")
         s.setLong(1, stampValue)
         s.setTimestamp(2, new java.sql.Timestamp((new java.util.Date).getTime))

@@ -10,12 +10,7 @@ create table key_value_history
 
 create index on key_value_history (stamp);
 
-create table last_stamp
-(
-        last_stamp      bigint
-);
-
-insert into last_stamp (last_stamp) values (0);
+create sequence stamp;
 
 create table stamp_time
 (
