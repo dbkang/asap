@@ -11,15 +11,20 @@
       url: '/home',
       template: '<h1>HOME!</h1>'
     });
-
+    
+    // TODO: all these should come from a separate module definition at some point
     $stateProvider.state('blog', {
       url: '/blog',
-      templateUrl: '/static/partials/blog.html'
+      templateUrl: '/static/partials/blog.html',
+      controller: ['$scope', function ($scope) {
+        $scope.blogTitle = "Dan's Blog"; // TODO: this should come from DB
+      }]
     });
 
     $stateProvider.state('blog.post', {
       url: '/post',
-      templateUrl: '/static/partials/blog.post.html'
+      templateUrl: '/static/partials/blog.post.html',
+      controller: 'BlogPost'
     });
 
     $stateProvider.state('blog.view', {
@@ -29,7 +34,8 @@
 
     $stateProvider.state('blog.edit', {
       url: '/edit/:id',
-      templateUrl: '/static/partials/blog.edit.html'
+      templateUrl: '/static/partials/blog.edit.html',
+      controller: 'BlogEdit'
     });
   }
 
