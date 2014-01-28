@@ -29,7 +29,8 @@
 
     $stateProvider.state('blog.view', {
       url: '/view/:id',
-      templateUrl: '/static/partials/blog.view.html'
+      templateUrl: '/static/partials/blog.view.html',
+      controller: 'BlogView'
     });
 
     $stateProvider.state('blog.edit', {

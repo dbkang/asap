@@ -11,7 +11,7 @@
     $scope.savePost = function(post) {
       $http.post('/api/autostore/default/blog', post).then(function(response) {
         $state.transitionTo('blog.view', { id: response.data });
-      })
+      });
     };
 
     $scope.cancel = function () {

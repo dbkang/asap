@@ -7,10 +7,14 @@
     $scope.post.title = "New Title";
     $scope.post.body = "Type body here";
 
+    $http.get('/api/autostore/default/blog/' + $stateParms.id).then(function(response) {
+      $scope.post = response.data;
+    });
 
     $scope.savePost = function(post) {
-      // TODO: Save
-      $state.transitionTo('blog.view', { id: $stateParams.id });
+      $http.put('/api/autostore/default/blog/' + $stateParams.id, post).then(function(response) {
+        $state.transitionTo('blog.view', { id: response.data });
+      });
     };
 
     $scope.cancel = function () {
